@@ -1,0 +1,156 @@
+#Uncomment the "servlet" and "context-path" lines below to make the fhir endpoint available at /example/path/fhir instead of the default value of /fhir
+server:
+#  servlet:
+#    context-path: /example/path
+  port: 8080
+
+#Adds the option to go to eg. http://localhost:8080/actuator/health for seeing the running configuration
+#see https://docs.spring.io/spring-boot/docs/current/reference/html/actuator.html#actuator.endpoints
+management:
+  endpoints:
+    enabled-by-default: false
+    web:
+      exposure:
+        include: 'health,info,prometheus,metrics' # Keep extended exposure from previous debugging
+  endpoint:
+    info:
+      enabled: true
+    metrics:
+      enabled: true
+    health:
+      enabled: true
+      probes:
+        enabled: true
+      group:
+        liveness:
+          include:
+            - livenessState
+            - readinessState
+        readiness: # Add readiness group
+          include:
+           - readinessState
+           - db
+    prometheus:
+      enabled: true
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+
+spring:
+  main:
+    allow-circular-references: true
+    # allow-bean-definition-overriding: true # Keep commented unless needed
+  # autoconfigure: # Keep commented/missing - DO NOT exclude DataSourceAutoConfiguration
+  #  exclude: org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration
+  # context: # Keep commented - DO NOT component scan
+  #   component-scan:
+  #     base-packages: com.fhirflare.custom
+  flyway:
+    enabled: false
+    baselineOnMigrate: true
+    fail-on-missing-locations: false
+  datasource:
+    # These properties are used by Spring Boot's default DataSourceAutoConfiguration
+    url: jdbc:h2:file:/app/h2-data/fhir;DB_CLOSE_DELAY=-1;AUTO_SERVER=TRUE
+    username: sa
+    password: '' # <<< CHANGED FROM null
+    driverClassName: org.h2.Driver
+    # max-active: 15 # Use hikari settings instead
+    hikari:
+      maximum-pool-size: 10
+  jpa:
+    properties:
+      hibernate.format_sql: false
+      hibernate.show_sql: false
+      hibernate.dialect: ca.uhn.fhir.jpa.model.dialect.HapiFhirH2Dialect
+      hibernate.hbm2ddl.auto: update # <<< ENSURE UNCOMMENTED/SET TO update (or appropriate value)
+      hibernate.search.enabled: false
+
+# --- HAPI FHIR ---
+hapi:
+  fhir:
+    # --- REGISTER YOUR CUSTOMIZER DIRECTLY VIA HAPI PROPERTY ---
+    # HAPI FHIR will find this class on the classpath (from the JAR in tomcat/lib)
+    # and instantiate it using reflection.
+    custom-provider-classes: com.fhirflare.custom.ResourceWhitelistCapabilityStatementCustomizer # <<< ADDED/UNCOMMENTED
+
+    # --- Keep the rest of your working hapi.fhir settings below ---
+    cr:
+      enabled: false
+      caregaps:
+        reporter: "default"
+        section_author: "default"
+      cql:
+        use_embedded_libraries: true
+        compiler:
+          error_level: Info
+          signature_level: All
+          enable_annotations: true
+          enable_locators: true
+          enable_results_type: true
+          enable_detailed_errors: true
+        runtime:
+          debug_logging_enabled: false # Set true if debugging CQL
+        terminology:
+          valueset_preexpansion_mode: REQUIRE
+          valueset_expansion_mode: PERFORM_NAIVE_EXPANSION
+          valueset_membership_mode: USE_EXPANSION
+          code_lookup_mode: USE_VALIDATE_CODE_OPERATION
+        data:
+          search_parameter_mode: USE_SEARCH_PARAMETERS
+          terminology_parameter_mode: FILTER_IN_MEMORY
+          profile_mode: DECLARED
+
+    cdshooks:
+      enabled: false
+      clientIdHeaderName: client_id
+
+    openapi_enabled: true
+    fhir_version: R4
+    ig_runtime_upload_enabled: false
+    custom_content_path: ./custom
+    advanced_lucene_indexing: false
+    bulk_export_enabled: false
+    bulk_import_enabled: false
+    narrative_enabled: true
+    mdm_enabled: false
+    mdm_rules_json_location: "mdm-rules.json"
+    logical_urls:
+      - http://terminology.hl7.org/*
+      - https://terminology.hl7.org/*
+      - http://snomed.info/*
+      - https://snomed.info/*
+      - http://unitsofmeasure.org/*
+      - https://unitsofmeasure.org/*
+      - http://loinc.org/*
+      - https://loinc.org/*
+    cors:
+      allow_Credentials: true
+      allowed_origin:
+        - '*'
+    search-coord-core-pool-size: 20
+    search-coord-max-pool-size: 100
+    search-coord-queue-capacity: 200
+    search_prefetch_thresholds: 13,503,2003,-1
+    tester:
+      home:
+        name: FHIRFLARE Tester
+        server_address: http://localhost:8080/fhir
+        refuse_to_fetch_third_party_urls: false
+        fhir_version: R4
+      global:
+        name: Global Tester
+        server_address: "http://hapi.fhir.org/baseR4"
+        refuse_to_fetch_third_party_urls: false
+        fhir_version: R4
+    inline_resource_storage_below_size: 4000
+
+# --- Logging Configuration ---
+logging:
+  level:
+    ROOT: INFO
+    com.fhirflare.custom: DEBUG # <<< Add logging for your custom class package
+
+# --- NO fhirflare: custom: section needed here, using environment variable ---
+#elasticsearch: ... (keep commented)
